@@ -28,14 +28,14 @@ impl VM {
         }
     }
 
-    pub fn execute(&mut self, bytecode: &[u8]) -> Result<(), String> {
+    pub fn execute(&mut self, bytecode: &[u8]) -> Result<Vec<u8>, String> {
         while (self.pc as usize) < bytecode.len() {
             let opcode = bytecode[self.pc as usize];
             self.pc += 1;
 
             match opcode {
                 // STOP
-                0x00 => return Ok(()),
+                0x00 => return Ok(vec![]),
 
                 // ADD: pop two, push sum (wrapping 256-bit)
                 0x01 => {
@@ -44,7 +44,7 @@ impl VM {
                     self.push(add_u256(a, b));
                 }
 
-                // MUL (same as add but uses mul_256)
+               // MUL (same as add but uses mul_256)
                 0x02 => { 
                     let a = self.pop()?;
                     let b = self.pop()?;
@@ -91,14 +91,19 @@ impl VM {
                 }
 
                 // PUSH1: read next byte, push it as a 32-byte value
-                0x60 => {
+                0x60..=0x7f=> {
+                    let n = (opcode - 0x60 + 1) as usize;
+
                     if (self.pc as usize) >= bytecode.len() {
                         return Err("PUSH1: missing operand".into());
                     }
-                    let byte = bytecode[self.pc as usize];
-                    self.pc += 1;
-                    let mut val = [0u8; 32];
-                    val[31] = byte;
+                    let bytes = &bytecode[self.pc as usize..self.pc as usize + n];
+
+                    let mut val = [0u8;32]; 
+
+                    val[32 - n..32].copy_from_slice(bytes);
+
+                    self.pc += n as u64;
                     self.push(val);
                 }
                 0x16 => { 
@@ -228,6 +233,25 @@ impl VM {
                     }
                 }
 
+                0xF3 => { 
+
+                    let offset = self.pop()?;
+                    let offset = u64::from_be_bytes(
+                        offset[24..32].try_into().unwrap()
+                    ) as usize;
+
+                    let size = self.pop()?;
+                    let size = u64::from_be_bytes(
+                        size [24..32].try_into().unwrap()
+                    ) as usize;
+
+
+                    self.ensure_memory(offset, size);
+
+                    return Ok(self.memory[offset..offset+size].to_vec());
+
+                }
+
                 0x5b => {}
             
                 // POP: discard top of stack
@@ -258,7 +282,7 @@ impl VM {
             }
         }
 
-        Ok(())
+        Ok(vec![])
     }
 
     fn push(&mut self, val: [u8; 32]) {
