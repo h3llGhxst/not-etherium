@@ -94,7 +94,7 @@ impl VM {
                 0x60..=0x7f=> {
                     let n = (opcode - 0x60 + 1) as usize;
 
-                    if (self.pc as usize) >= bytecode.len() {
+                    if (self.pc as usize + n) >= bytecode.len() {
                         return Err("PUSH1: missing operand".into());
                     }
                     let bytes = &bytecode[self.pc as usize..self.pc as usize + n];
