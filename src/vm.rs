@@ -1,11 +1,12 @@
 use std::{collections::HashMap};
 
 pub struct VM {
-    stack:   Vec<[u8; 32]>,
-    pc:      u64,
-    gas:     u64,
-    memory:  Vec<u8>,
-    storage: HashMap<[u8; 32], [u8; 32]>,
+    stack:      Vec<[u8; 32]>,
+    pc:         u64,
+    gas:        u64,
+    memory:     Vec<u8>,
+    calldata:   Vec<u8>,
+    storage:    HashMap<[u8; 32], [u8; 32]>,
 }
 
 impl VM {
@@ -20,20 +21,48 @@ impl VM {
 
     pub fn new() -> Self {
         VM {
-            stack:   Vec::new(),
-            pc:      0,
-            gas:     0,
-            memory:  Vec::new(),
-            storage: HashMap::new(),
+            stack:      Vec::new(),
+            pc:         0,
+            gas:        0,
+            memory:     Vec::new(),
+            storage:    HashMap::new(),
+            calldata:   Vec::new()
         }
     }
 
-    pub fn execute(&mut self, bytecode: &[u8]) -> Result<Vec<u8>, String> {
+    pub fn execute(&mut self, bytecode: &[u8], calldata: Vec<u8>) -> Result<Vec<u8>, String> {
         while (self.pc as usize) < bytecode.len() {
             let opcode = bytecode[self.pc as usize];
             self.pc += 1;
 
             match opcode {
+
+                //call data
+                // args are encoded to calldata
+                // example: 
+                //  transfer(adress: u245){...}
+                //  calldata takes and "contains" adress/
+                
+                //1 :CALLDATASIZE 
+                
+                0x36 => { 
+                    let mut val = [0u8; 32];
+                    val[24..32].copy_from_slice(&(self.calldata.len() as u64).to_be_bytes());
+                    self.push(val);
+                }
+
+                // 2.CALLDATALOAD
+                    
+                0x35 => {
+                    let offset = self.pop()?;
+                    let offset = u64::from_be_bytes(offset[24..32].try_into().unwrap()) as usize;
+
+                    let mut val = [0u8; 32];
+                    let available = self.calldata.len().saturating_sub(offset).min(32);
+                    val[..available].copy_from_slice(&self.calldata[offset..offset + available]);
+                    self.push(val);
+                }
+
                 // STOP
                 0x00 => return Ok(vec![]),
 
