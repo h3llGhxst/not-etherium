@@ -31,6 +31,7 @@ impl VM {
     }
 
     pub fn execute(&mut self, bytecode: &[u8], calldata: Vec<u8>) -> Result<Vec<u8>, String> {
+        self.calldata = calldata;
         while (self.pc as usize) < bytecode.len() {
             let opcode = bytecode[self.pc as usize];
             self.pc += 1;
