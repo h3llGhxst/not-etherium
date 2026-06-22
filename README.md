@@ -30,15 +30,17 @@ State lives in the `VM` struct (`src/vm.rs`):
 | `calldata` | `Vec<u8>`                   | input data for the call             |
 | `storage`  | `HashMap<[u8;32], [u8;32]>` | persistent key/value storage        |
 
-256-bit arithmetic is hand-rolled (`add_u256`, `sub_u256`, `mul_u256`, `div_u256`) since
-Rust has no native u256 — see the bottom of `src/vm.rs`.
+256-bit arithmetic is hand-rolled (`add_u256`, `sub_u256`, `mul_u256`, `divmod_u256`) since
+Rust has no native u256 — see the bottom of `src/vm.rs`. Signed ops build on these:
+`is_neg` tests the top bit, `neg_u256` does two's-complement negation (`NOT + 1`), and
+`sdiv`/`smod` strip signs, divide magnitudes via `divmod_u256`, then re-apply the sign.
 
 ## Implemented opcodes
 
 | Group       | Opcodes                                             |
 |-------------|-----------------------------------------------------|
-| Arithmetic  | `ADD` `MUL` `SUB` `DIV`                              |
-| Comparison  | `LT` `GT` `EQ` `ISZERO`                              |
+| Arithmetic  | `ADD` `MUL` `SUB` `DIV` `SDIV` `SMOD`                |
+| Comparison  | `LT` `GT` `EQ` `ISZERO` `SLT` `SGT`                  |
 | Bitwise     | `AND` `OR` `XOR` `NOT`                               |
 | Memory      | `MLOAD` `MSTORE` `MSTORE8`                           |
 | Storage     | `SLOAD` `SSTORE`                                     |
@@ -66,10 +68,20 @@ RETURN          # return memory[0..32]
 
 Expected output: the 32-byte word ending in `...0102`.
 
+## Tests
+
+```bash
+cargo test
+```
+
+Unit tests live in `src/vm.rs` and exercise the signed ops directly — covering the
+sign-rule edge cases (negate-on-different-signs for `SDIV`, sign-follows-dividend for
+`SMOD`, the raw-bytes trap for `SLT`) plus division by zero and the `divmod_u256` split.
+
 ## Roadmap
 
 - [ ] Gas metering (per-opcode cost, out-of-gas halt)
-- [ ] Signed ops (`SDIV`, `SMOD`, `SLT`, `SGT`, `SIGNEXTEND`)
+- [ ] Finish signed ops (`SAR`, `SIGNEXTEND`)
 - [ ] `MOD` `ADDMOD` `MULMOD` `EXP`
 - [ ] Shifts (`SHL` `SHR` `SAR`)
 - [ ] `KECCAK256`
