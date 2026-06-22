@@ -93,6 +93,19 @@ impl VM {
                     self.push(div_u256(a,b));
                 }
 
+                0x05 => { 
+                    let a = self.pop()?;
+                    let b = self.pop()?;
+                    self.push(sdiv(a, b));
+                }
+
+                0x07 => {
+                    let a = self.pop()?;
+                    let b = self.pop()?;
+                    self.push(smod(a, b));
+
+                }
+
                 // LT: a < b
                 0x10 => {
                     let a = self.pop()?;
@@ -365,9 +378,11 @@ fn sub_u256(a: [u8; 32], b :[u8; 32]) -> [u8; 32] {
     result
 }
 
-fn div_u256(a: [u8; 32], b: [u8; 32]) -> [u8; 32] {
+// raw unsigned long division: returns (quotient, remainder) in one pass.
+// div_u256 / mod_u256 are thin wrappers; sdiv/smod sign-wrap these.
+fn divmod_u256(a: [u8; 32], b: [u8; 32]) -> ([u8; 32], [u8; 32]) {
     if b == [0u8; 32] {
-        return [0u8; 32];
+        return ([0u8; 32], [0u8; 32]);
     }
 
     let to_limbs = |x: [u8; 32]| -> [u64; 8] {
@@ -426,8 +441,36 @@ fn div_u256(a: [u8; 32], b: [u8; 32]) -> [u8; 32] {
         }
     }
 
-    from_limbs(quotient)
+    (from_limbs(quotient), from_limbs(remainder))
 }
+
+fn div_u256(a: [u8; 32], b: [u8; 32]) -> [u8; 32] {
+    divmod_u256(a, b).0
+}
+
+//SMOD
+
+fn smod(a: [u8 ;32] , b: [u8; 32]) -> [u8;32] {
+    let neg = is_neg(&a);
+    let (_,r) = divmod_u256(abs(a), abs(b)); 
+
+    if neg { neg_u256(r)} else {
+        r
+    }
+}
+
+// SDIV
+
+fn sdiv(a: [u8;32] , b: [u8;32]) -> [u8;32] {
+    let neg = is_neg(&a) != is_neg(&b); 
+    let q = div_u256(abs(a), abs(b));
+    if neg { neg_u256(q) } else {
+        q
+    }
+}
+
+
+
 
 fn cmp_u256(a: &[u8; 32], b: &[u8; 32]) -> std::cmp::Ordering {
     a.cmp(b)
@@ -542,4 +585,18 @@ fn slt(a: [u8; 32] , b: [u8; 32]) -> bool {
     }
     true
 }
+
+fn neg_u256(val :[u8;32]) -> [u8; 32] {
+    let mut one = [0u8;32];
+    one[31] = 1;
+    add_u256(not_u256(val), one)
+}
+
+fn abs(val : [u8;32]) -> [u8;32]{
+    if is_neg(&val) {
+        return neg_u256(val)
+    }
+    val
+}
+
 
