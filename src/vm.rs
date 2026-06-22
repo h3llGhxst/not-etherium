@@ -289,6 +289,13 @@ impl VM {
                     self.push(bool_to_u256(slt(a, b)));
                 }
 
+                //SGT - IVERSE OF SLT
+                0x13 => { 
+                    let a = self.pop()?;
+                    let b = self.pop()?;
+                    self.push(bool_to_u256(slt(b, a)));
+                }
+
                 0x5b => {}
             
                 // POP: discard top of stack
