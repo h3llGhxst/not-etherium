@@ -282,6 +282,13 @@ impl VM {
 
                 }
 
+                //SLT 
+                0x12 => { 
+                    let a = self.pop()?;
+                    let b = self.pop()?;
+                    self.push(bool_to_u256(slt(a, b)));
+                }
+
                 0x5b => {}
             
                 // POP: discard top of stack
@@ -490,5 +497,42 @@ fn not_u256(a: [u8;32 ]) -> [u8; 32] {
         result[i]  = !a[i]
     }
     result
+}
+
+//  0x80 = 10000.. 
+//  negative numbers have leading 1s .. eg .. 11100111 (for example)
+//  if the results of 0x80 AND val means that teh val was negative 
+//  positive numbers are always in form 0011011.... 
+//  so 
+//      0x80 AND pos_val would just be 00000... 
+//
+// and then there was light ;>)
+fn is_neg(val : &[u8; 32]) -> bool{
+    val[0] & 0x80 != 0
+}
+
+fn slt(a: [u8; 32] , b: [u8; 32]) -> bool {
+
+    let a_neg = is_neg(&a);
+    let b_neg = is_neg(&b);
+
+    if a_neg != b_neg { 
+
+        if a_neg && !b_neg { 
+            return true;
+        }
+
+        if !a_neg && b_neg {
+            return false;
+        }
+    } 
+
+    if a_neg == b_neg {
+        if a < b { 
+            return true
+        }
+        return false
+    }
+    true
 }
 
