@@ -599,4 +599,89 @@ fn abs(val : [u8;32]) -> [u8;32]{
     val
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // small positive int -> u256 (big-endian, low bytes)
+    fn u(n: u64) -> [u8; 32] {
+        let mut x = [0u8; 32];
+        x[24..32].copy_from_slice(&n.to_be_bytes());
+        x
+    }
+    // negative int -> u256 via two's complement
+    fn neg(n: u64) -> [u8; 32] {
+        neg_u256(u(n))
+    }
+
+    // ---- SDIV: negate when signs differ ----
+    #[test]
+    fn sdiv_pos_pos() {
+        assert_eq!(sdiv(u(12), u(3)), u(4));
+    }
+    #[test]
+    fn sdiv_neg_pos() {
+        // -12 / 3 == -4
+        assert_eq!(sdiv(neg(12), u(3)), neg(4));
+    }
+    #[test]
+    fn sdiv_neg_neg() {
+        // -12 / -3 == 4  (the same-sign case the `||` bug broke)
+        assert_eq!(sdiv(neg(12), neg(3)), u(4));
+    }
+    #[test]
+    fn sdiv_by_zero() {
+        assert_eq!(sdiv(neg(12), u(0)), u(0));
+    }
+
+    // ---- SMOD: sign follows the dividend ----
+    #[test]
+    fn smod_pos_neg() {
+        // 12 % -5 == 2  (XOR rule would wrongly give -2)
+        assert_eq!(smod(u(12), neg(5)), u(2));
+    }
+    #[test]
+    fn smod_neg_pos() {
+        // -12 % 5 == -2
+        assert_eq!(smod(neg(12), u(5)), neg(2));
+    }
+    #[test]
+    fn smod_neg_neg() {
+        // -12 % -5 == -2
+        assert_eq!(smod(neg(12), neg(5)), neg(2));
+    }
+    #[test]
+    fn smod_by_zero() {
+        assert_eq!(smod(u(12), u(0)), u(0));
+    }
+
+    // ---- SLT: signed comparison, not raw bytes ----
+    #[test]
+    fn slt_neg_lt_pos() {
+        // -1 < 1  (raw bytes would say -1 is huge -> false; signed -> true)
+        assert!(slt(neg(1), u(1)));
+    }
+    #[test]
+    fn slt_pos_not_lt_neg() {
+        assert!(!slt(u(1), neg(1)));
+    }
+    #[test]
+    fn slt_both_neg() {
+        // -5 < -1  is true
+        assert!(slt(neg(5), neg(1)));
+    }
+    #[test]
+    fn slt_equal_is_false() {
+        assert!(!slt(u(7), u(7)));
+    }
+
+    // ---- divmod refactor sanity ----
+    #[test]
+    fn divmod_returns_q_and_r() {
+        let (q, r) = divmod_u256(u(17), u(5));
+        assert_eq!(q, u(3));
+        assert_eq!(r, u(2));
+    }
+}
+
 
