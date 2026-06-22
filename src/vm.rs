@@ -93,6 +93,19 @@ impl VM {
                     self.push(div_u256(a,b));
                 }
 
+                0x05 => { 
+                    let a = self.pop()?;
+                    let b = self.pop()?;
+                    self.push(sdiv(a, b));
+                }
+
+                0x07 => {
+                    let a = self.pop()?;
+                    let b = self.pop()?;
+                    self.push(smod(a, b));
+
+                }
+
                 // LT: a < b
                 0x10 => {
                     let a = self.pop()?;
@@ -282,6 +295,20 @@ impl VM {
 
                 }
 
+                //SLT 
+                0x12 => { 
+                    let a = self.pop()?;
+                    let b = self.pop()?;
+                    self.push(bool_to_u256(slt(a, b)));
+                }
+
+                //SGT - IVERSE OF SLT
+                0x13 => { 
+                    let a = self.pop()?;
+                    let b = self.pop()?;
+                    self.push(bool_to_u256(slt(b, a)));
+                }
+
                 0x5b => {}
             
                 // POP: discard top of stack
@@ -351,9 +378,11 @@ fn sub_u256(a: [u8; 32], b :[u8; 32]) -> [u8; 32] {
     result
 }
 
-fn div_u256(a: [u8; 32], b: [u8; 32]) -> [u8; 32] {
+// raw unsigned long division: returns (quotient, remainder) in one pass.
+// div_u256 / mod_u256 are thin wrappers; sdiv/smod sign-wrap these.
+fn divmod_u256(a: [u8; 32], b: [u8; 32]) -> ([u8; 32], [u8; 32]) {
     if b == [0u8; 32] {
-        return [0u8; 32];
+        return ([0u8; 32], [0u8; 32]);
     }
 
     let to_limbs = |x: [u8; 32]| -> [u64; 8] {
@@ -412,8 +441,36 @@ fn div_u256(a: [u8; 32], b: [u8; 32]) -> [u8; 32] {
         }
     }
 
-    from_limbs(quotient)
+    (from_limbs(quotient), from_limbs(remainder))
 }
+
+fn div_u256(a: [u8; 32], b: [u8; 32]) -> [u8; 32] {
+    divmod_u256(a, b).0
+}
+
+//SMOD
+
+fn smod(a: [u8 ;32] , b: [u8; 32]) -> [u8;32] {
+    let neg = is_neg(&a);
+    let (_,r) = divmod_u256(abs(a), abs(b)); 
+
+    if neg { neg_u256(r)} else {
+        r
+    }
+}
+
+// SDIV
+
+fn sdiv(a: [u8;32] , b: [u8;32]) -> [u8;32] {
+    let neg = is_neg(&a) != is_neg(&b); 
+    let q = div_u256(abs(a), abs(b));
+    if neg { neg_u256(q) } else {
+        q
+    }
+}
+
+
+
 
 fn cmp_u256(a: &[u8; 32], b: &[u8; 32]) -> std::cmp::Ordering {
     a.cmp(b)
@@ -491,4 +548,55 @@ fn not_u256(a: [u8;32 ]) -> [u8; 32] {
     }
     result
 }
+
+//  0x80 = 10000.. 
+//  negative numbers have leading 1s .. eg .. 11100111 (for example)
+//  if the results of 0x80 AND val means that teh val was negative 
+//  positive numbers are always in form 0011011.... 
+//  so 
+//      0x80 AND pos_val would just be 00000... 
+//
+// and then there was light ;>)
+fn is_neg(val : &[u8; 32]) -> bool{
+    val[0] & 0x80 != 0
+}
+
+fn slt(a: [u8; 32] , b: [u8; 32]) -> bool {
+
+    let a_neg = is_neg(&a);
+    let b_neg = is_neg(&b);
+
+    if a_neg != b_neg { 
+
+        if a_neg && !b_neg { 
+            return true;
+        }
+
+        if !a_neg && b_neg {
+            return false;
+        }
+    } 
+
+    if a_neg == b_neg {
+        if a < b { 
+            return true
+        }
+        return false
+    }
+    true
+}
+
+fn neg_u256(val :[u8;32]) -> [u8; 32] {
+    let mut one = [0u8;32];
+    one[31] = 1;
+    add_u256(not_u256(val), one)
+}
+
+fn abs(val : [u8;32]) -> [u8;32]{
+    if is_neg(&val) {
+        return neg_u256(val)
+    }
+    val
+}
+
 
