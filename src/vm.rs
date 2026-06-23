@@ -352,7 +352,7 @@ impl VM {
 }
 
 // wrapping big-endian addition for 256-bit values
-fn add_u256(a: [u8; 32], b: [u8; 32]) -> [u8; 32] {
+pub fn add_u256(a: [u8; 32], b: [u8; 32]) -> [u8; 32] {
     let mut result = [0u8; 32];
     let mut carry: u16 = 0;
     for i in (0..32).rev() {
@@ -363,7 +363,7 @@ fn add_u256(a: [u8; 32], b: [u8; 32]) -> [u8; 32] {
     result
 }
 
-fn sub_u256(a: [u8; 32], b :[u8; 32]) -> [u8; 32] { 
+pub fn sub_u256(a: [u8; 32], b :[u8; 32]) -> [u8; 32] {
     let mut result = [0u8; 32]; 
 
     let mut borrow : i16 = 0 ; 
@@ -472,7 +472,7 @@ fn sdiv(a: [u8;32] , b: [u8;32]) -> [u8;32] {
 
 
 
-fn cmp_u256(a: &[u8; 32], b: &[u8; 32]) -> std::cmp::Ordering {
+pub fn cmp_u256(a: &[u8; 32], b: &[u8; 32]) -> std::cmp::Ordering {
     a.cmp(b)
 }
 
